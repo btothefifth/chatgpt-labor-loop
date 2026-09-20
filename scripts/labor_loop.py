@@ -119,11 +119,17 @@ DEFAULT_EXCLUDES = [
 DEFAULT_INCLUDE = [
     "README.md",
     "README.rst",
+    "LICENSE",
+    "SKILL.md",
+    "agents",
+    "scripts",
+    "references",
     "Cargo.toml",
     "Cargo.lock",
     "pyproject.toml",
     "src",
     "tests",
+    "docs",
     "docs/implementation/CURRENT.md",
     "docs/product",
 ]
