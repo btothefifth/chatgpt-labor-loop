@@ -162,6 +162,45 @@ class LaborLoopTests(unittest.TestCase):
             "main checkout must remain unchanged",
         )
 
+    def test_initial_request_requires_direct_or_public_artifact_delivery(self) -> None:
+        job = self.make_job()
+        job_dir = self.state / "projects" / self.project_id / "jobs" / job["job_id"]
+        request = (job_dir / "REQUEST.md").read_text(encoding="utf-8")
+        packet_job = json.loads((job_dir / "job.json").read_text(encoding="utf-8"))
+        self.assertIn("attaching the ZIP directly", request)
+        self.assertIn("public HTTPS URL", request)
+        self.assertIn("backend/API endpoint", request)
+        self.assertEqual(
+            packet_job["artifact_delivery"]["preferred"], "direct-attachment"
+        )
+
+    def test_artifact_followup_repeats_delivery_contract(self) -> None:
+        job = self.make_job()
+        self.advance_to_worker_complete(job["job_id"])
+        followup = self.cli(
+            "artifact-followup",
+            "--job-id",
+            job["job_id"],
+            "--reason",
+            "worker returned an inaccessible backend API link",
+        )
+        self.assertIn("Attach the ZIP directly", followup["prompt"])
+        self.assertIn("public HTTPS URL", followup["prompt"])
+        self.assertIn("Do not return a `file://` path", followup["prompt"])
+        self.assertIn(job["job_id"], followup["prompt"])
+        timeline = [
+            json.loads(line)
+            for line in (
+                self.state / "projects" / self.project_id / "timeline.jsonl"
+            )
+            .read_text(encoding="utf-8")
+            .splitlines()
+        ]
+        self.assertIn(
+            "artifact delivery follow-up prepared",
+            [event["note"] for event in timeline],
+        )
+
     def test_record_submission_binds_thread_and_advances_running_atomically(self) -> None:
         job = self.make_job()
         result = self.cli(

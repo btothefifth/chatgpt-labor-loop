@@ -39,3 +39,19 @@ mismatches, and likely secret material before extraction.
 The worker may report partial progress, but it must not claim local test proof
 that it could not actually run. It must list unresolved work and assumptions.
 The local review accepts only what the repository and local checks establish.
+
+## Artifact delivery
+
+Delivery is part of the worker contract, not an optional presentation detail.
+The preferred result is the ZIP attached directly to the ChatGPT response. A
+fallback public URL is acceptable only when it is HTTPS and can be opened
+without login, cookies, bearer tokens, internal hostnames, private-network
+addresses, localhost, or a session-bound/backend/API endpoint. `file://` paths
+and inaccessible execution-environment links are not valid deliveries.
+
+The browser adapter must download the attachment or public URL visibly, then
+`record-artifact` and `validate-artifact` must succeed locally. A worker claim
+or a URL-shaped string is never proof that delivery occurred. If the worker
+returns only an inaccessible link, use the state-aware `artifact-followup`
+command to generate a recovery request in the same thread. The follow-up must
+repeat the same direct-attachment/public-URL contract.

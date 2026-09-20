@@ -47,7 +47,9 @@ do not broaden the patch by guessing at selectors or service endpoints.
    durable identity.
 3. Immediately before file upload and message send, obtain the required action
    confirmation. Upload only the generated packet ZIP and send the standalone
-   request; do not paste secrets or local paths.
+   request; do not paste secrets or local paths. The generated request contains
+   the artifact-delivery contract: ask the worker to attach the result ZIP
+   directly to the response, with a public HTTPS URL as the only fallback.
 4. After the send is visibly accepted, run `record-submission` once with the
    visible canonical thread URL and stable thread identity. Add
    `--worker-started` only when the worker is visibly answering; this records
@@ -60,10 +62,27 @@ do not broaden the patch by guessing at selectors or service endpoints.
    repository contract, or explicit project config determines the answer. For a
    product choice, security boundary, unexpected auth challenge, or repeated
    failure, record `BLOCKED` and ask the user.
-6. When a completed message exposes the expected artifact, download it through
-   the visible browser control, record `ARTIFACT_DOWNLOADED`, and hand the path
-   to `record-artifact`. Never trust the download merely because its filename
-   looks correct.
+6. When a completed message exposes the expected artifact, prefer the visible
+   direct attachment. A fallback URL must be HTTPS, have no embedded
+   credentials, and not target localhost, a private/reserved address, an
+   internal hostname, or a backend/API/session-only endpoint. Open/download it
+   visibly, record `ARTIFACT_DOWNLOADED`, and hand the local path to
+   `record-artifact`. Never trust a URL-shaped string merely because its
+   filename looks correct.
+7. If the worker gives only an inaccessible backend/API link, do not keep
+   retrying that link. Prepare the state-aware recovery request:
+
+   ```text
+   python -B scripts/labor_loop.py --project-id <id> artifact-followup \
+     --job-id <job-id> \
+     --reason "worker returned an inaccessible backend or session link"
+   ```
+
+   Send the generated prompt as a follow-up in the same mapped thread. It asks
+   for a direct attachment first and a genuinely public HTTPS URL second. If
+   neither is possible, the worker must report delivery blocked rather than
+   claim completion. Sending the follow-up remains a visible browser action;
+   the CLI only prepares and records the request.
 
 Do not automate login, password entry, CAPTCHA, rate-limit evasion, hidden
 network endpoints, cookie extraction, or browser profile copying. If the UI

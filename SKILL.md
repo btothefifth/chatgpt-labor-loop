@@ -27,7 +27,7 @@ The local scripts in [scripts/labor_loop.py](scripts/labor_loop.py) own determin
 3. Before browser work, run the browser bridge preflight from [references/browser-adapter.md](references/browser-adapter.md). Diagnose first; apply only an exact supported repair, retain its backup and syntax receipt, restart/recreate the browser runtime, and rerun a harmless smoke test. Never guess a new patch or automate authentication.
 4. Bind the project to its persistent ChatGPT thread with `bind-thread` if needed. Reuse the mapping on later rounds; replace it only on an intentional reset.
 5. Before any representational browser action, use the supported browser controls to resolve the mapped thread, upload the packet, and send the request. Ask for the required action confirmation immediately before upload/send. After the browser visibly confirms the send, use `record-submission` once to persist the canonical thread mapping and advance `SUBMITTED`; add `--worker-started` only after the worker is visibly answering. Do not use hidden endpoints or scrape credentials.
-6. Poll with increasing backoff at the automation layer, not with repeated Luna reasoning. Classify visible worker state as running, completed, clarification, limit/error, or authentication-needed. Answer only questions objectively resolved by the packet; otherwise record `BLOCKED` and ask the user. Download only the produced artifact, then record and validate it locally.
+6. Poll with increasing backoff at the automation layer, not with repeated Luna reasoning. Classify visible worker state as running, completed, clarification, limit/error, or authentication-needed. Answer only questions objectively resolved by the packet; otherwise record `BLOCKED` and ask the user. Require the worker to attach the ZIP directly or provide a genuinely public HTTPS URL; reject backend, API, localhost, private-network, file, and session-only links. Download only the produced artifact, then record and validate it locally. If delivery fails, use `artifact-followup` to repeat the same contract in the existing thread.
 7. Run the safe integration path. `integrate` creates a detached Git worktree from the pinned base, checks and applies only the canonical patch, then runs configured argv-array checks. It never writes the project’s main checkout. Review the diff and requirements yourself, then record `COMPLETE`, `NEEDS_FOLLOWUP`, or `BLOCKED` with an explicit note.
 8. If work remains, create a new bounded request with `next`/`start`, preserving the parent job and the timeline. Stop on the configured maximum jobs/time/failures, milestone completion, no meaningful delegatable work, or a human decision.
 
@@ -37,7 +37,7 @@ The CLI is deliberately explicit and resumable:
 
 ```text
 init, bind-thread, record-submission, start, status, resume, inspect, transition,
-record-artifact, validate-artifact, integrate, run-checks, repair-checks,
+record-artifact, validate-artifact, artifact-followup, integrate, run-checks, repair-checks,
 review, retry, abort, next
 ```
 
@@ -56,5 +56,6 @@ acceptance boundary. Use `inspect` before trusting a returned package.
 - Apply only `changes.patch` after `git apply --check`; use complete files only as review/recovery material. Never replay both representations and never run worker-supplied installer, deployment, upload, or Git scripts.
 - Keep one mutation owner for a project. Preserve unrelated dirty files and never force-push, rewrite history, deploy, enable authority, or expand credentials as part of this loop.
 - A green worker report is not local evidence. Keep code, focused checks, integration, review, and external/live behavior as separate status dimensions.
+- Artifact delivery is also a proof boundary. A backend/API link, local path, or inaccessible URL is not a returned artifact; request a direct attachment or public HTTPS URL and only advance after a local download and validation receipt.
 
 Read [references/worker-contract.md](references/worker-contract.md) when creating or reviewing a packet, and [references/architecture.md](references/architecture.md) when changing the state machine or browser boundary.

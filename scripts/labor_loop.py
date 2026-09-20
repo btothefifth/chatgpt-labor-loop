@@ -677,6 +677,48 @@ evidence/<optional supporting evidence>
 manifest.json must include this job_id, base_commit, and repository. changes.patch
 is the canonical integration representation. Be honest about partial work and
 unresolved items; do not claim tests that were not actually run.
+
+Artifact delivery is part of acceptance. Prefer attaching the ZIP directly to
+this ChatGPT response so it appears as a downloadable attachment. If a direct
+attachment is unavailable, provide a genuinely public HTTPS URL that works
+without login, cookies, bearer tokens, an internal hostname, a private-network
+address, a localhost address, or a session-bound/backend/API endpoint. Do not
+return a file:// path or ask the integrator to fetch an inaccessible backend
+link. If neither direct attachment nor a public URL is possible, report
+delivery as blocked and do not claim that the artifact was delivered.
+"""
+
+
+def artifact_delivery_followup(
+    *, job_id: str, base_commit: str, repository_url: str | None, reason: str
+) -> str:
+    """Build a safe, reusable recovery request for a failed artifact delivery."""
+    repository_line = f"Repository: {repository_url}\n" if repository_url else ""
+    return f"""# Artifact delivery recovery
+
+The implementation response for job `{job_id}` did not produce a usable local
+artifact. The integration owner observed this delivery problem:
+
+> {reason}
+
+Please repackage the completed work and return the same integration contract.
+The pinned base commit is `{base_commit}`.
+{repository_line}
+Delivery is part of acceptance. Use one of these methods, in priority order:
+
+1. Attach the ZIP directly to this ChatGPT response so it is visibly
+   downloadable.
+2. If direct attachment is unavailable, provide a genuinely public HTTPS URL
+   that can be opened without login, cookies, bearer tokens, an internal
+   hostname, a private-network address, a localhost address, or a
+   session-bound/backend/API endpoint.
+
+Do not return a `file://` path, localhost URL, internal/backend/API URL, or a
+link that only works inside your execution environment. Do not claim delivery
+until the attachment or public URL is actually present. If neither method is
+possible, state that artifact delivery is blocked and explain why. Preserve
+the required ZIP root layout, `job_id`, `base_commit`, `repository`, and
+`changes.patch` contract from the original request.
 """
 
 
@@ -785,6 +827,12 @@ def create_job(
         },
         "scope": {"local_changes_excluded": info["changed"]},
         "return_contract": worker_return_contract(),
+        "artifact_delivery": {
+            "schema_version": "labor-loop.artifact-delivery.v1",
+            "preferred": "direct-attachment",
+            "fallback": "public-https-url",
+            "backend-or-session-links": "rejected",
+        },
         "parent_job_id": parent_job_id,
     }
     request_out = (
@@ -1555,7 +1603,7 @@ def cmd_resume(args: argparse.Namespace) -> dict[str, Any]:
         "PACKAGED": "resolve the mapped ChatGPT thread, confirm, upload packet, send request, then transition SUBMITTED",
         "SUBMITTED": "inspect the ChatGPT thread and classify whether the worker started",
         "WORKER_RUNNING": "poll with backoff; record completion, clarification, limit, or blocked state",
-        "WORKER_COMPLETE": "discover/download the returned ZIP and record-artifact",
+        "WORKER_COMPLETE": "discover/download the returned ZIP and record-artifact; if only a backend/session link was returned, use artifact-followup",
         "ARTIFACT_DISCOVERED": "record-artifact <downloaded-zip>",
         "ARTIFACT_DOWNLOADED": "validate-artifact",
         "VALIDATED": "integrate",
@@ -1573,6 +1621,69 @@ def cmd_resume(args: argparse.Namespace) -> dict[str, Any]:
         "status": state["status"],
         "next_action": next_action,
         "thread": project["worker"],
+    }
+
+
+def cmd_artifact_followup(args: argparse.Namespace) -> dict[str, Any]:
+    """Prepare a delivery-only follow-up without sending a browser message."""
+    store, project, state = current_state_for_args(args)
+    allowed = {"WORKER_COMPLETE", "ARTIFACT_DISCOVERED", "BLOCKED", "FAILED"}
+    if state["status"] not in allowed:
+        raise LaborError(
+            "artifact-followup requires WORKER_COMPLETE, ARTIFACT_DISCOVERED, "
+            f"BLOCKED, or an artifact-related FAILED state; found {state['status']}"
+        )
+    if state["status"] == "FAILED" and state.get("failure_kind") not in {
+        "artifact-validation",
+        "artifact-delivery",
+    }:
+        raise LaborError(
+            "artifact-followup is limited to artifact delivery/validation failures"
+        )
+    reason = args.reason.strip()
+    if not reason:
+        raise LaborError("artifact-followup requires a non-empty --reason")
+    if len(reason) > 2000:
+        raise LaborError("artifact-followup reason exceeds 2000 characters")
+    if contains_secret(reason):
+        raise LaborError("artifact-followup reason contains a likely secret")
+    safe_reason = scrub_local_paths(reason, Path(str(state["repository_path"])))
+    repository_url = project["repository"].get("url")
+    prompt = artifact_delivery_followup(
+        job_id=state["job_id"],
+        base_commit=str(state["base_commit"]),
+        repository_url=repository_url,
+        reason=safe_reason,
+    )
+    output_path = None
+    with store.lock():
+        current = store.load_state(state["job_id"])
+        current["job_dir"] = str(store.job_dir(current["job_id"]))
+        store.append_event(
+            {
+                "schema_version": SCHEMA,
+                "at": now_iso(),
+                "project_id": current["project_id"],
+                "job_id": current["job_id"],
+                "from": current["status"],
+                "to": current["status"],
+                "note": "artifact delivery follow-up prepared",
+                "extra": {"reason": safe_reason},
+            }
+        )
+        if args.output:
+            output = Path(args.output).expanduser().resolve()
+            if output.exists() and output.is_symlink():
+                raise LaborError(f"refusing symlink output: {output}")
+            output.parent.mkdir(parents=True, exist_ok=True)
+            atomic_write_text(output, prompt)
+            output_path = str(output)
+    return {
+        "job_id": state["job_id"],
+        "status": state["status"],
+        "prompt": prompt,
+        "output_path": output_path,
+        "send_manually_or_with_browser_adapter": True,
     }
 
 
@@ -1839,6 +1950,14 @@ def build_parser() -> argparse.ArgumentParser:
     repair_checks.add_argument("--allow-no-checks", action="store_true")
     repair_checks.add_argument("--note", default="local validation repair applied")
 
+    artifact_followup = sub.add_parser(
+        "artifact-followup",
+        help="prepare a direct-attachment/public-URL recovery request",
+    )
+    artifact_followup.add_argument("--job-id")
+    artifact_followup.add_argument("--reason", required=True)
+    artifact_followup.add_argument("--output")
+
     review = sub.add_parser("review")
     review.add_argument("--job-id")
     review.add_argument(
@@ -1886,6 +2005,8 @@ def dispatch(args: argparse.Namespace) -> dict[str, Any]:
         return cmd_run_checks(args)
     if args.command == "repair-checks":
         return cmd_repair_checks(args)
+    if args.command == "artifact-followup":
+        return cmd_artifact_followup(args)
     if args.command == "review":
         return cmd_review(args)
     if args.command == "retry":

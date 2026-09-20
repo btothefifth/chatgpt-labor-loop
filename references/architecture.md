@@ -47,6 +47,15 @@ submit(packet)                     # confirmation immediately before upload/send
 download_result(thread) -> path
 ```
 
+Artifact delivery is a second explicit browser boundary. The worker request
+requires a direct attachment, with a public HTTPS URL as fallback. Backend/API,
+local, private-network, authenticated, and session-bound links are not valid
+observations. If delivery fails, `artifact-followup` creates a repeatable
+same-thread recovery prompt and records that preparation in the timeline. The
+browser adapter still performs the visible send and download; the local core
+does not pretend that a URL is a file until `record-artifact` and local ZIP
+validation succeed.
+
 The adapter may call `scripts/repair_browser_bridge.py` as a separate local
 preflight when the browser runtime itself is unhealthy. This is an environment
 repair boundary, not a worker operation: it is read-only until explicitly

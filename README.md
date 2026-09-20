@@ -89,6 +89,23 @@ the job, and does not duplicate timeline events. A different worker URL or
 provider thread ID is rejected for an active job; abort/retry is required
 before intentionally changing worker identity.
 
+Artifact delivery is explicit. Every generated worker request requires the
+worker to attach the result ZIP directly to the ChatGPT response. A genuinely
+public HTTPS URL is the only fallback; backend/API, localhost, private-network,
+`file://`, authenticated, and session-bound links are not acceptable. If the
+worker returns an inaccessible link, prepare a same-thread recovery request:
+
+```text
+python -B scripts/labor_loop.py --project-id example-project artifact-followup `
+  --job-id LL-... `
+  --reason "worker returned an inaccessible backend or session link"
+```
+
+Send that generated prompt through the visible browser adapter. It repeats the
+direct-attachment/public-URL requirement and does not silently fetch a backend
+link. The artifact still must be downloaded locally and pass `record-artifact`
+and `validate-artifact` before integration.
+
 ## Testing
 
 ```text
