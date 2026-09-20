@@ -196,6 +196,42 @@ class LaborLoopTests(unittest.TestCase):
         ]
         self.assertIn("THREAD_BOUND", [event["to"] for event in events])
 
+    def test_record_submission_is_idempotent_after_worker_started(self) -> None:
+        job = self.make_job()
+        submission = [
+            "record-submission",
+            "--job-id",
+            job["job_id"],
+            "--thread-url",
+            "https://chatgpt.com/c/idempotent-thread",
+            "--thread-id",
+            "WEB:idempotent-thread",
+            "--model-mode",
+            "6 Pro",
+            "--worker-started",
+        ]
+        first = self.cli(*submission)
+        second = self.cli(*submission)
+        self.assertEqual(first["status"], "WORKER_RUNNING")
+        self.assertEqual(second["status"], "WORKER_RUNNING")
+        self.assertTrue(second["idempotent"])
+        events = [
+            json.loads(line)
+            for line in (
+                self.state / "projects" / self.project_id / "timeline.jsonl"
+            )
+            .read_text(encoding="utf-8")
+            .splitlines()
+        ]
+        self.assertEqual(
+            [event["to"] for event in events].count("THREAD_BOUND"),
+            1,
+        )
+        self.assertEqual(
+            [event["to"] for event in events].count("WORKER_RUNNING"),
+            1,
+        )
+
     def test_record_submission_rejects_thread_replacement_without_explicit_flag(self) -> None:
         job = self.make_job()
         self.cli(

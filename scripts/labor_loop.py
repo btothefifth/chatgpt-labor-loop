@@ -1377,65 +1377,111 @@ def cmd_record_submission(args: argparse.Namespace) -> dict[str, Any]:
     with store.lock():
         project = store.load_project()
         state = store.load_state(args.job_id if args.job_id else None)
-        if state["status"] != "PACKAGED":
+        status = str(state["status"])
+        was_already_submitted = status != "PACKAGED"
+        state_url = state.get("thread_url")
+        state_thread_id = state.get("thread_id")
+        same_submission = (not state_url or state_url == url) and (
+            not state_thread_id
+            or not args.thread_id
+            or state_thread_id == args.thread_id
+        )
+        if status not in {"PACKAGED", "SUBMITTED", "WORKER_RUNNING"}:
+            if same_submission and status in {
+                "WORKER_COMPLETE",
+                "ARTIFACT_DISCOVERED",
+                "ARTIFACT_DOWNLOADED",
+                "VALIDATED",
+                "INTEGRATING",
+                "TESTING",
+                "REVIEWING",
+                "COMPLETE",
+            }:
+                # A browser retry can arrive after durable state advanced. It
+                # must never regress the state or append a duplicate event.
+                return {
+                    "job_id": state["job_id"],
+                    "status": status,
+                    "thread_url": state_url or url,
+                    "thread_id": state_thread_id or args.thread_id,
+                    "worker_started": args.worker_started,
+                    "idempotent": True,
+                }
             raise LaborError(
-                "record-submission requires PACKAGED state, "
-                f"found {state['status']}"
+                "record-submission requires PACKAGED, SUBMITTED, or WORKER_RUNNING state, "
+                f"found {status}"
             )
         existing = project["worker"].get("thread_url")
+        existing_thread_id = project["worker"].get("thread_id")
         if existing and existing != url and not args.replace:
             raise LaborError(
                 "a different thread is already bound; pass --replace for an intentional reset"
             )
+        if not same_submission:
+            raise LaborError(
+                "submission identity differs from the durable job receipt; "
+                "abort/retry the job before using a different worker thread"
+            )
+        recorded_thread_id = args.thread_id or state_thread_id or existing_thread_id
+        binding_changed = (
+            existing != url
+            or existing_thread_id != recorded_thread_id
+            or project["worker"].get("browser") != args.browser
+            or project["worker"].get("model_mode") != args.model_mode
+        )
         worker = dict(project["worker"])
         worker.update(
             {
                 "provider": "chatgpt-chat",
                 "thread_url": url,
-                "thread_id": args.thread_id,
+                "thread_id": recorded_thread_id,
                 "browser": args.browser,
                 "model_mode": args.model_mode,
             }
         )
         project["worker"] = worker
-        store.save_project(project)
-        store.append_event(
-            {
-                "schema_version": SCHEMA,
-                "at": now_iso(),
-                "project_id": args.project_id,
-                "job_id": state["job_id"],
-                "from": None,
-                "to": "THREAD_BOUND",
-                "note": "browser adapter recorded the submitted worker thread",
-                "thread_url": url,
-                "thread_id": args.thread_id,
-                "browser": args.browser,
-            }
-        )
-        state = transition(
-            store,
-            state,
-            "SUBMITTED",
-            args.note,
-            thread_url=url,
-            thread_id=args.thread_id,
-        )
-        if args.worker_started:
+        if binding_changed:
+            store.save_project(project)
+            store.append_event(
+                {
+                    "schema_version": SCHEMA,
+                    "at": now_iso(),
+                    "project_id": args.project_id,
+                    "job_id": state["job_id"],
+                    "from": None,
+                    "to": "THREAD_BOUND",
+                    "note": "browser adapter recorded the submitted worker thread",
+                    "thread_url": url,
+                    "thread_id": recorded_thread_id,
+                    "browser": args.browser,
+                }
+            )
+        if status == "PACKAGED":
+            state = transition(
+                store,
+                state,
+                "SUBMITTED",
+                args.note,
+                thread_url=url,
+                thread_id=recorded_thread_id,
+            )
+            status = "SUBMITTED"
+        if args.worker_started and status == "SUBMITTED":
             state = transition(
                 store,
                 state,
                 "WORKER_RUNNING",
                 "worker visibly entered its answering state",
                 thread_url=url,
-                thread_id=args.thread_id,
+                thread_id=recorded_thread_id,
             )
     return {
         "job_id": state["job_id"],
         "status": state["status"],
         "thread_url": url,
-        "thread_id": args.thread_id,
+        "thread_id": recorded_thread_id,
         "worker_started": args.worker_started,
+        "idempotent": was_already_submitted,
     }
 
 
