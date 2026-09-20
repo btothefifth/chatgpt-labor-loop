@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.labor-loop-state/
+worker-packet.zip
+artifact.zip
+checks/
+validated/
+worktree/

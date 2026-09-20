@@ -1,0 +1,45 @@
+{
+  "schema_version": "labor-loop.project.v1",
+  "project_id": "example-project",
+  "repository": {
+    "path": "C:/work/example-project",
+    "url": "https://github.com/example/example-project.git",
+    "default_branch": "main"
+  },
+  "worker": {
+    "provider": "chatgpt-chat",
+    "thread_url": null,
+    "thread_id": null,
+    "model_mode": "configured",
+    "browser": "chrome",
+    "require_confirmation": true
+  },
+  "packet": {
+    "include_paths": ["README.md", "src", "tests", "docs/implementation/CURRENT.md"],
+    "exclude_globs": [".git/**", ".env*", "*.pem", "*.key", "*.p12", "*.pcap", "*.pcapng", "target/**", "node_modules/**", ".venv/**"],
+    "max_files": 250,
+    "max_file_bytes": 1048576,
+    "max_total_bytes": 12582912
+  },
+  "artifacts": {
+    "max_zip_bytes": 52428800,
+    "max_member_bytes": 10485760,
+    "max_total_uncompressed_bytes": 104857600,
+    "max_members": 1000
+  },
+  "validation": {
+    "commands": [
+      {"name": "build", "argv": ["cargo", "build"]},
+      {"name": "test", "argv": ["cargo", "test"]}
+    ],
+    "timeout_seconds": 1800
+  },
+  "loop": {
+    "max_jobs": 3,
+    "max_elapsed_seconds": 21600,
+    "max_consecutive_failures": 2
+  },
+  "integration": {
+    "worktree_root": null
+  }
+}

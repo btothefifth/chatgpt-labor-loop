@@ -1,0 +1,7 @@
+interface:
+  display_name: "Labor Loop"
+  short_description: "Delegate, validate, and resume ChatGPT work"
+  default_prompt: "Use $labor-loop to delegate a bounded implementation slice to the persistent ChatGPT worker, validate it locally, and integrate it safely."
+
+policy:
+  allow_implicit_invocation: true
