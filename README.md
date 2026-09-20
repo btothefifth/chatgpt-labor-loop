@@ -45,6 +45,19 @@ project-specific `validation.commands` as argv arrays; worker-provided commands
 are never executed. The browser submission and polling procedure is documented
 in `references/browser-adapter.md`.
 
+After the browser adapter visibly uploads the packet and sends the request,
+record that receipt in one operation. Add `--worker-started` only after the
+worker is visibly answering:
+
+```text
+python -B scripts/labor_loop.py --project-id example-project record-submission `
+  --job-id LL-... --thread-url https://chatgpt.com/c/... `
+  --thread-id WEB:... --model-mode configured --worker-started
+```
+
+This command does not send a message or control a browser; it makes the
+already-observed external action durable and atomic with the local lifecycle.
+
 ## Testing
 
 ```text

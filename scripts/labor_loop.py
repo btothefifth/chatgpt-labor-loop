@@ -1362,6 +1362,77 @@ def cmd_bind_thread(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
+def cmd_record_submission(args: argparse.Namespace) -> dict[str, Any]:
+    """Persist a browser adapter's successful send observation atomically."""
+    store, project = project_and_store(args)
+    url = args.thread_url.strip()
+    if not re.fullmatch(r"https://(?:chatgpt\.com|chat\.openai\.com)/.+", url):
+        raise LaborError("thread URL must be an https ChatGPT conversation URL")
+    with store.lock():
+        project = store.load_project()
+        state = store.load_state(args.job_id if args.job_id else None)
+        if state["status"] != "PACKAGED":
+            raise LaborError(
+                "record-submission requires PACKAGED state, "
+                f"found {state['status']}"
+            )
+        existing = project["worker"].get("thread_url")
+        if existing and existing != url and not args.replace:
+            raise LaborError(
+                "a different thread is already bound; pass --replace for an intentional reset"
+            )
+        worker = dict(project["worker"])
+        worker.update(
+            {
+                "provider": "chatgpt-chat",
+                "thread_url": url,
+                "thread_id": args.thread_id,
+                "browser": args.browser,
+                "model_mode": args.model_mode,
+            }
+        )
+        project["worker"] = worker
+        store.save_project(project)
+        store.append_event(
+            {
+                "schema_version": SCHEMA,
+                "at": now_iso(),
+                "project_id": args.project_id,
+                "job_id": state["job_id"],
+                "from": None,
+                "to": "THREAD_BOUND",
+                "note": "browser adapter recorded the submitted worker thread",
+                "thread_url": url,
+                "thread_id": args.thread_id,
+                "browser": args.browser,
+            }
+        )
+        state = transition(
+            store,
+            state,
+            "SUBMITTED",
+            args.note,
+            thread_url=url,
+            thread_id=args.thread_id,
+        )
+        if args.worker_started:
+            state = transition(
+                store,
+                state,
+                "WORKER_RUNNING",
+                "worker visibly entered its answering state",
+                thread_url=url,
+                thread_id=args.thread_id,
+            )
+    return {
+        "job_id": state["job_id"],
+        "status": state["status"],
+        "thread_url": url,
+        "thread_id": args.thread_id,
+        "worker_started": args.worker_started,
+    }
+
+
 def cmd_start(
     args: argparse.Namespace, parent_job_id: str | None = None
 ) -> dict[str, Any]:
@@ -1412,6 +1483,8 @@ def cmd_status(args: argparse.Namespace) -> dict[str, Any]:
                 "artifact_path",
                 "worktree_path",
                 "last_note",
+                "thread_url",
+                "thread_id",
             )
         }
         if store.timeline_path.exists():
@@ -1635,6 +1708,19 @@ def build_parser() -> argparse.ArgumentParser:
     bind.add_argument("--model-mode", default="configured")
     bind.add_argument("--replace", action="store_true")
 
+    submission = sub.add_parser(
+        "record-submission",
+        help="atomically record a browser adapter's already-completed send",
+    )
+    submission.add_argument("--job-id")
+    submission.add_argument("--thread-url", required=True)
+    submission.add_argument("--thread-id")
+    submission.add_argument("--browser", default="chrome")
+    submission.add_argument("--model-mode", default="configured")
+    submission.add_argument("--replace", action="store_true")
+    submission.add_argument("--worker-started", action="store_true")
+    submission.add_argument("--note", default="worker request submitted")
+
     for name in ("start", "next"):
         command = sub.add_parser(name)
         command.add_argument("--request", required=True)
@@ -1687,6 +1773,8 @@ def dispatch(args: argparse.Namespace) -> dict[str, Any]:
         return cmd_init(args)
     if args.command == "bind-thread":
         return cmd_bind_thread(args)
+    if args.command == "record-submission":
+        return cmd_record_submission(args)
     if args.command == "start":
         return cmd_start(args)
     if args.command == "next":

@@ -14,9 +14,12 @@ state model:
 3. Immediately before file upload and message send, obtain the required action
    confirmation. Upload only the generated packet ZIP and send the standalone
    request; do not paste secrets or local paths.
-4. Record `SUBMITTED` and `WORKER_RUNNING` with the CLI. Poll with exponential
-   backoff (for example 15s, 30s, 60s, 120s, then 5-minute intervals) and keep
-   Luna out of a tight reasoning loop. Read-only polling is safe; a follow-up
+4. After the send is visibly accepted, run `record-submission` once with the
+   visible canonical thread URL and stable thread identity. Add
+   `--worker-started` only when the worker is visibly answering; this records
+   the mapping and lifecycle atomically. Poll with exponential backoff (for
+   example 15s, 30s, 60s, 120s, then 5-minute intervals) and keep Luna out of
+   a tight reasoning loop. Read-only polling is safe; a follow-up
    answer to a worker question is another representational message and requires
    the same action confirmation.
 5. If the worker asks a question, answer automatically only when the request,

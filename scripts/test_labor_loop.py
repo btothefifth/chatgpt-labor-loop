@@ -162,6 +162,67 @@ class LaborLoopTests(unittest.TestCase):
             "main checkout must remain unchanged",
         )
 
+    def test_record_submission_binds_thread_and_advances_running_atomically(self) -> None:
+        job = self.make_job()
+        result = self.cli(
+            "record-submission",
+            "--job-id",
+            job["job_id"],
+            "--thread-url",
+            "https://chatgpt.com/c/example-thread",
+            "--thread-id",
+            "WEB:example-thread",
+            "--model-mode",
+            "6 Pro",
+            "--worker-started",
+            "--note",
+            "fixture browser receipt",
+        )
+        self.assertEqual(result["status"], "WORKER_RUNNING")
+        status = self.cli("status")
+        self.assertEqual(status["thread"]["thread_id"], "WEB:example-thread")
+        self.assertEqual(status["thread"]["model_mode"], "6 Pro")
+        self.assertEqual(
+            status["current"]["thread_url"],
+            "https://chatgpt.com/c/example-thread",
+        )
+        events = [
+            json.loads(line)
+            for line in (
+                self.state / "projects" / self.project_id / "timeline.jsonl"
+            )
+            .read_text(encoding="utf-8")
+            .splitlines()
+        ]
+        self.assertIn("THREAD_BOUND", [event["to"] for event in events])
+
+    def test_record_submission_rejects_thread_replacement_without_explicit_flag(self) -> None:
+        job = self.make_job()
+        self.cli(
+            "record-submission",
+            "--job-id",
+            job["job_id"],
+            "--thread-url",
+            "https://chatgpt.com/c/first-thread",
+        )
+        self.cli(
+            "abort",
+            "--job-id",
+            job["job_id"],
+            "--note",
+            "rotate fixture job",
+        )
+        next_job = self.make_job()
+        second = self.cli(
+            "record-submission",
+            "--job-id",
+            next_job["job_id"],
+            "--thread-url",
+            "https://chatgpt.com/c/second-thread",
+            check=False,
+        )
+        self.assertIn("different thread is already bound", second["stderr"])
+
     def test_packet_omits_secret_path_and_records_omission(self) -> None:
         self.write(".env", "API_KEY=not-for-upload-123456789\n")
         self.git(["add", ".env"])

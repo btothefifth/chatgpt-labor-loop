@@ -25,7 +25,7 @@ The local scripts in [scripts/labor_loop.py](scripts/labor_loop.py) own determin
 
    The exact config shape is in [references/project-config.example.json](references/project-config.example.json). State defaults to `%LOCALAPPDATA%\Codex\labor-loop`; pass `--state-root` for a different private location.
 3. Bind the project to its persistent ChatGPT thread with `bind-thread` if needed. Reuse the mapping on later rounds; replace it only on an intentional reset.
-4. Before any representational browser action, use the supported browser controls to resolve the mapped thread, upload the packet, and send the request. Ask for the required action confirmation immediately before upload/send. Record `SUBMITTED` and `WORKER_RUNNING` through the CLI. Do not use hidden endpoints or scrape credentials.
+4. Before any representational browser action, use the supported browser controls to resolve the mapped thread, upload the packet, and send the request. Ask for the required action confirmation immediately before upload/send. After the browser visibly confirms the send, use `record-submission` once to persist the canonical thread mapping and advance `SUBMITTED`; add `--worker-started` only after the worker is visibly answering. Do not use hidden endpoints or scrape credentials.
 5. Poll with increasing backoff at the automation layer, not with repeated Luna reasoning. Classify visible worker state as running, completed, clarification, limit/error, or authentication-needed. Answer only questions objectively resolved by the packet; otherwise record `BLOCKED` and ask the user. Download only the produced artifact, then record and validate it locally.
 6. Run the safe integration path. `integrate` creates a detached Git worktree from the pinned base, checks and applies only the canonical patch, then runs configured argv-array checks. It never writes the project’s main checkout. Review the diff and requirements yourself, then record `COMPLETE`, `NEEDS_FOLLOWUP`, or `BLOCKED` with an explicit note.
 7. If work remains, create a new bounded request with `next`/`start`, preserving the parent job and the timeline. Stop on the configured maximum jobs/time/failures, milestone completion, no meaningful delegatable work, or a human decision.
@@ -35,7 +35,7 @@ The local scripts in [scripts/labor_loop.py](scripts/labor_loop.py) own determin
 The CLI is deliberately explicit and resumable:
 
 ```text
-init, bind-thread, start, status, resume, inspect, transition,
+init, bind-thread, record-submission, start, status, resume, inspect, transition,
 record-artifact, validate-artifact, integrate, run-checks,
 review, retry, abort, next
 ```

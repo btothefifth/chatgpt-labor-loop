@@ -47,6 +47,12 @@ submit(packet)                     # confirmation immediately before upload/send
 download_result(thread) -> path
 ```
 
+Once `submit(packet)` returns a visible receipt, the adapter should call the
+CLI's `record-submission` operation with the canonical thread URL and stable
+thread identity. That operation atomically updates the project mapping and
+job state; it is a local receipt writer, not another browser action. A later
+worker-running observation may advance the same receipt to `WORKER_RUNNING`.
+
 A future supported bridge may implement the same operations without changing
 the local state machine. It must not store credentials or bypass product
 controls. Browser tab IDs are hints only; the canonical mapping is a visible
