@@ -5,6 +5,40 @@ tools rather than a stable local ChatGPT API. The labor-loop skill keeps the
 adapter behind the following procedure so DOM details do not leak into the
 state model:
 
+## Bridge preflight and recovery
+
+Before attempting an upload or download, run the read-only bridge diagnosis
+against the runtime root supplied by the host:
+
+```text
+python -B scripts/repair_browser_bridge.py --root <runtime-root> diagnose
+```
+
+The companion utility recognizes only narrow `browser-service.mjs` files under
+a discovered runtime layout. It never reads browser profiles, cookies,
+credentials, or page contents. If it reports an exact known repair, apply it
+with an explicit write request:
+
+```text
+python -B scripts/repair_browser_bridge.py --root <runtime-root> repair --apply
+```
+
+The request-header repair bounds an optional policy lookup. The attachment
+download fallback is deliberately separate because it changes how an
+unmanaged document response is handled:
+
+```text
+python -B scripts/repair_browser_bridge.py --root <runtime-root> repair --apply --download-fallback
+```
+
+Only use the download fallback when the visible browser failure is a blocked
+attachment download and the exact gate is present. The utility creates a
+timestamped backup, writes atomically, runs `node --check`, and rolls back the
+file if syntax validation fails. Restart or recreate the browser-control
+runtime after any successful repair, then rerun `diagnose` and perform a
+harmless browser smoke test. An unknown layout is a stop-and-report condition;
+do not broaden the patch by guessing at selectors or service endpoints.
+
 1. Resolve the project’s stored `thread_url` in the existing authenticated
    Chrome session. If it is missing, ask the user to choose or create the dedicated
    project thread; do not guess from another project’s conversation.

@@ -45,6 +45,32 @@ project-specific `validation.commands` as argv arrays; worker-provided commands
 are never executed. The browser submission and polling procedure is documented
 in `references/browser-adapter.md`.
 
+## Browser bridge recovery
+
+The browser adapter is intentionally volatile. If it cannot claim the browser,
+or a visible attachment download is blocked before the adapter can observe it,
+use the standard-library repair utility before retrying the labor loop:
+
+```text
+python -B scripts/repair_browser_bridge.py --root <runtime-root> diagnose
+python -B scripts/repair_browser_bridge.py --root <runtime-root> repair --apply
+```
+
+For a confirmed blocked attachment-download gate, opt in explicitly:
+
+```text
+python -B scripts/repair_browser_bridge.py --root <runtime-root> repair --apply --download-fallback
+```
+
+The utility is deliberately conservative. It discovers only known
+`browser-service.mjs` files beneath the supplied runtime root, matches exact
+known source patterns, refuses symlinks and path escapes, creates a backup,
+uses an atomic replacement, and runs `node --check`. It never handles login,
+credentials, cookies, CAPTCHAs, hidden APIs, or rate-limit bypasses. After a
+successful repair, restart or recreate the browser-control runtime, rerun
+`diagnose`, and perform a harmless browser smoke test. Unknown layouts should
+be reported for maintenance rather than patched by guesswork.
+
 After the browser adapter visibly uploads the packet and sends the request,
 record that receipt in one operation. Add `--worker-started` only after the
 worker is visibly answering:
@@ -67,6 +93,7 @@ before intentionally changing worker identity.
 
 ```text
 python -B scripts/test_labor_loop.py
+python -B scripts/test_browser_repair.py
 python -B -m py_compile scripts/labor_loop.py scripts/validate_artifact.py
 ```
 

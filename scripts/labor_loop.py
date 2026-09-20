@@ -89,7 +89,7 @@ TRANSITIONS: dict[str, set[str]] = {
     "COMPLETE": set(),
     "NEEDS_FOLLOWUP": {"PACKAGED", "ABORTED"},
     "BLOCKED": {"PACKAGED", "ABORTED"},
-    "FAILED": {"PACKAGED", "ABORTED"},
+    "FAILED": {"PACKAGED", "TESTING", "ABORTED"},
     "ABORTED": set(),
 }
 
@@ -1565,7 +1565,7 @@ def cmd_resume(args: argparse.Namespace) -> dict[str, Any]:
         "COMPLETE": "no further action for this job",
         "NEEDS_FOLLOWUP": "write the next bounded request and run next",
         "BLOCKED": "resolve the human/external blocker, then retry or start a follow-up",
-        "FAILED": "inspect the receipt and either repair locally or retry explicitly",
+        "FAILED": "inspect the receipt; use repair-checks for a local validation repair or retry explicitly",
         "ABORTED": "start a new job if still needed",
     }.get(state["status"], "inspect state")
     return {
@@ -1669,6 +1669,33 @@ def cmd_run_checks(args: argparse.Namespace) -> dict[str, Any]:
     with store.lock():
         state = store.load_state(state["job_id"])
         state["job_dir"] = str(store.job_dir(state["job_id"]))
+        return run_checks(store, state, project, allow_none=args.allow_no_checks)
+
+
+def cmd_repair_checks(args: argparse.Namespace) -> dict[str, Any]:
+    """Resume validation after an explicit local repair of an intact worktree."""
+    store, project, state = current_state_for_args(args)
+    if state["status"] != "FAILED":
+        raise LaborError(
+            f"repair-checks requires FAILED state, found {state['status']}"
+        )
+    if state.get("failure_kind") != "validation":
+        raise LaborError(
+            "repair-checks is limited to validation failures; inspect and retry other failures"
+        )
+    worktree = Path(str(state.get("worktree_path") or ""))
+    if not worktree.is_dir():
+        raise LaborError("repair-checks requires the existing isolated worktree")
+    with store.lock():
+        state = store.load_state(state["job_id"])
+        state["job_dir"] = str(store.job_dir(state["job_id"]))
+        transition(
+            store,
+            state,
+            "TESTING",
+            args.note,
+            recovery_kind="validation-repair",
+        )
         return run_checks(store, state, project, allow_none=args.allow_no_checks)
 
 
@@ -1804,6 +1831,13 @@ def build_parser() -> argparse.ArgumentParser:
     checks = sub.add_parser("run-checks")
     checks.add_argument("--job-id")
     checks.add_argument("--allow-no-checks", action="store_true")
+    repair_checks = sub.add_parser(
+        "repair-checks",
+        help="rerun checks after an explicit local repair of an intact worktree",
+    )
+    repair_checks.add_argument("--job-id")
+    repair_checks.add_argument("--allow-no-checks", action="store_true")
+    repair_checks.add_argument("--note", default="local validation repair applied")
 
     review = sub.add_parser("review")
     review.add_argument("--job-id")
@@ -1850,6 +1884,8 @@ def dispatch(args: argparse.Namespace) -> dict[str, Any]:
         return cmd_integrate(args)
     if args.command == "run-checks":
         return cmd_run_checks(args)
+    if args.command == "repair-checks":
+        return cmd_repair_checks(args)
     if args.command == "review":
         return cmd_review(args)
     if args.command == "retry":

@@ -24,11 +24,12 @@ The local scripts in [scripts/labor_loop.py](scripts/labor_loop.py) own determin
    ```
 
    The exact config shape is in [references/project-config.example.json](references/project-config.example.json). State defaults to `%LOCALAPPDATA%\Codex\labor-loop`; pass `--state-root` for a different private location.
-3. Bind the project to its persistent ChatGPT thread with `bind-thread` if needed. Reuse the mapping on later rounds; replace it only on an intentional reset.
-4. Before any representational browser action, use the supported browser controls to resolve the mapped thread, upload the packet, and send the request. Ask for the required action confirmation immediately before upload/send. After the browser visibly confirms the send, use `record-submission` once to persist the canonical thread mapping and advance `SUBMITTED`; add `--worker-started` only after the worker is visibly answering. Do not use hidden endpoints or scrape credentials.
-5. Poll with increasing backoff at the automation layer, not with repeated Luna reasoning. Classify visible worker state as running, completed, clarification, limit/error, or authentication-needed. Answer only questions objectively resolved by the packet; otherwise record `BLOCKED` and ask the user. Download only the produced artifact, then record and validate it locally.
-6. Run the safe integration path. `integrate` creates a detached Git worktree from the pinned base, checks and applies only the canonical patch, then runs configured argv-array checks. It never writes the project’s main checkout. Review the diff and requirements yourself, then record `COMPLETE`, `NEEDS_FOLLOWUP`, or `BLOCKED` with an explicit note.
-7. If work remains, create a new bounded request with `next`/`start`, preserving the parent job and the timeline. Stop on the configured maximum jobs/time/failures, milestone completion, no meaningful delegatable work, or a human decision.
+3. Before browser work, run the browser bridge preflight from [references/browser-adapter.md](references/browser-adapter.md). Diagnose first; apply only an exact supported repair, retain its backup and syntax receipt, restart/recreate the browser runtime, and rerun a harmless smoke test. Never guess a new patch or automate authentication.
+4. Bind the project to its persistent ChatGPT thread with `bind-thread` if needed. Reuse the mapping on later rounds; replace it only on an intentional reset.
+5. Before any representational browser action, use the supported browser controls to resolve the mapped thread, upload the packet, and send the request. Ask for the required action confirmation immediately before upload/send. After the browser visibly confirms the send, use `record-submission` once to persist the canonical thread mapping and advance `SUBMITTED`; add `--worker-started` only after the worker is visibly answering. Do not use hidden endpoints or scrape credentials.
+6. Poll with increasing backoff at the automation layer, not with repeated Luna reasoning. Classify visible worker state as running, completed, clarification, limit/error, or authentication-needed. Answer only questions objectively resolved by the packet; otherwise record `BLOCKED` and ask the user. Download only the produced artifact, then record and validate it locally.
+7. Run the safe integration path. `integrate` creates a detached Git worktree from the pinned base, checks and applies only the canonical patch, then runs configured argv-array checks. It never writes the project’s main checkout. Review the diff and requirements yourself, then record `COMPLETE`, `NEEDS_FOLLOWUP`, or `BLOCKED` with an explicit note.
+8. If work remains, create a new bounded request with `next`/`start`, preserving the parent job and the timeline. Stop on the configured maximum jobs/time/failures, milestone completion, no meaningful delegatable work, or a human decision.
 
 ## Commands
 
@@ -36,11 +37,17 @@ The CLI is deliberately explicit and resumable:
 
 ```text
 init, bind-thread, record-submission, start, status, resume, inspect, transition,
-record-artifact, validate-artifact, integrate, run-checks,
+record-artifact, validate-artifact, integrate, run-checks, repair-checks,
 review, retry, abort, next
 ```
 
-Use `status` after interruption and `resume` to obtain the next safe action. `transition` is for browser/lifecycle observations only; it does not apply code. `review` is the acceptance boundary. Use `inspect` before trusting a returned package.
+Use `status` after interruption and `resume` to obtain the next safe action. If
+a local validation command fails after the isolated worktree has been repaired,
+use `repair-checks` to rerun the configured checks without creating a new
+worker job. It is limited to validation failures with an intact worktree;
+other failures require inspection and an explicit retry. `transition` is for
+browser/lifecycle observations only; it does not apply code. `review` is the
+acceptance boundary. Use `inspect` before trusting a returned package.
 
 ## Required safety rules
 

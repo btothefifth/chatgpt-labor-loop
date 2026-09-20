@@ -47,6 +47,16 @@ submit(packet)                     # confirmation immediately before upload/send
 download_result(thread) -> path
 ```
 
+The adapter may call `scripts/repair_browser_bridge.py` as a separate local
+preflight when the browser runtime itself is unhealthy. This is an environment
+repair boundary, not a worker operation: it is read-only until explicitly
+asked to apply, operates only on exact recognized runtime files, creates a
+backup, performs an atomic replacement, and requires a runtime restart/recreate
+before the browser adapter retries. Diagnosis, patch result, backup path,
+before/after hashes, and syntax-check result should remain observable in the
+local receipt. Unknown layouts and authentication challenges remain human-stop
+conditions.
+
 Once `submit(packet)` returns a visible receipt, the adapter should call the
 CLI's `record-submission` operation with the canonical thread URL and stable
 thread identity. That operation atomically updates the project mapping and
@@ -65,7 +75,10 @@ The canonical returned representation is `changes.patch`. The integration
 command creates a detached worktree at the pinned base, runs `git apply --check`,
 applies exactly once, then executes project-configured argv arrays. Worker
 scripts are never executed. Codex reviews the diff and decides whether the job
-is accepted or needs another packet.
+is accepted or needs another packet. A failed local check does not necessarily
+require a new worker round: after an explicit, reviewable repair in the same
+isolated worktree, `repair-checks` can rerun validation and preserve the job
+history. It refuses artifact, patch, and missing-worktree failures.
 
 This design keeps three boundaries independent: browser side effects, local
 filesystem/Git mutation, and project-specific build/test commands.

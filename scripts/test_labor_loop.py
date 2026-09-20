@@ -196,6 +196,31 @@ class LaborLoopTests(unittest.TestCase):
         ]
         self.assertIn("THREAD_BOUND", [event["to"] for event in events])
 
+    def test_repair_checks_resumes_after_local_validation_fix(self) -> None:
+        job = self.make_job()
+        job_id = job["job_id"]
+        base = job["base_commit"]
+        self.advance_to_worker_complete(job_id)
+        patch = """diff --git a/src/lib.txt b/src/lib.txt
+--- a/src/lib.txt
++++ b/src/lib.txt
+@@ -1 +1 @@
+-old
++new
+"""
+        artifact = self.make_artifact(job_id, base, patch)
+        self.cli("record-artifact", "--job-id", job_id, "--path", str(artifact))
+        self.cli("validate-artifact", "--job-id", job_id)
+        integrated = self.cli("integrate", "--job-id", job_id, "--skip-checks")
+        worktree = Path(integrated["worktree_path"])
+        (worktree / "src/lib.txt").write_text("new  \n", encoding="utf-8")
+        failed = self.cli("run-checks", "--job-id", job_id, check=False)
+        self.assertIn("validation command failed", failed["stderr"])
+        self.assertEqual(self.cli("status")["current"]["status"], "FAILED")
+        (worktree / "src/lib.txt").write_text("new\n", encoding="utf-8")
+        repaired = self.cli("repair-checks", "--job-id", job_id)
+        self.assertEqual(repaired["status"], "REVIEWING")
+
     def test_record_submission_is_idempotent_after_worker_started(self) -> None:
         job = self.make_job()
         submission = [
