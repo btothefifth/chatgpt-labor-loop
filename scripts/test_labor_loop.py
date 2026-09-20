@@ -232,6 +232,31 @@ class LaborLoopTests(unittest.TestCase):
             1,
         )
 
+    def test_active_submission_rejects_identity_change_even_with_replace(self) -> None:
+        job = self.make_job()
+        self.cli(
+            "record-submission",
+            "--job-id",
+            job["job_id"],
+            "--thread-url",
+            "https://chatgpt.com/c/original-thread",
+            "--thread-id",
+            "WEB:original-thread",
+            "--worker-started",
+        )
+        rejected = self.cli(
+            "record-submission",
+            "--job-id",
+            job["job_id"],
+            "--thread-url",
+            "https://chatgpt.com/c/replacement-thread",
+            "--thread-id",
+            "WEB:replacement-thread",
+            "--replace",
+            check=False,
+        )
+        self.assertIn("submission identity differs", rejected["stderr"])
+
     def test_record_submission_rejects_thread_replacement_without_explicit_flag(self) -> None:
         job = self.make_job()
         self.cli(
