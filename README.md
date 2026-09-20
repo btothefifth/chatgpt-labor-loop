@@ -57,6 +57,11 @@ python -B scripts/labor_loop.py --project-id example-project record-submission `
 
 This command does not send a message or control a browser; it makes the
 already-observed external action durable and atomic with the local lifecycle.
+It is safe to repeat after a browser or process interruption: a matching
+submission receipt is treated as an idempotent observation, does not regress
+the job, and does not duplicate timeline events. A different worker URL or
+provider thread ID is rejected for an active job; abort/retry is required
+before intentionally changing worker identity.
 
 ## Testing
 
