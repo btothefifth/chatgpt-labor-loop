@@ -13,7 +13,8 @@ CAPTCHAs, hidden endpoints, and rate-limit bypasses are out of scope.
 - private project-to-thread mapping and resumable per-job state;
 - sealed packets from pinned committed Git snapshots with secret/path filtering;
 - a machine-readable worker return contract;
-- a required recent-integration feedback section in every worker request;
+- a required recent-integration and relevant-seam feedback section in every
+  worker request;
 - safe ZIP validation before extraction;
 - detached-worktree patch integration and configured build/test/lint commands;
 - durable receipts, retry/abort/status operations, and a Codex review gate.

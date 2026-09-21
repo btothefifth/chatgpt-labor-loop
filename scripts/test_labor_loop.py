@@ -172,6 +172,8 @@ class LaborLoopTests(unittest.TestCase):
         self.assertIn("backend/API endpoint", request)
         self.assertIn("Recent integration feedback (required)", request)
         self.assertIn("intent mismatch", request)
+        self.assertIn("other recent or relevant implemented", request)
+        self.assertIn("Name the reviewed surfaces", request)
         self.assertEqual(
             packet_job["artifact_delivery"]["preferred"], "direct-attachment"
         )
@@ -190,6 +192,7 @@ class LaborLoopTests(unittest.TestCase):
         self.assertIn("public HTTPS URL", followup["prompt"])
         self.assertIn("Do not return a `file://` path", followup["prompt"])
         self.assertIn("Recent integration feedback (required)", followup["prompt"])
+        self.assertIn("other recent or relevant implemented", followup["prompt"])
         self.assertIn(job["job_id"], followup["prompt"])
         timeline = [
             json.loads(line)

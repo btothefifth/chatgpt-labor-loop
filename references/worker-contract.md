@@ -17,10 +17,11 @@ files, acceptance contract, and the exact return layout. It intentionally does
 not contain a local path, browser credentials, or browser storage.
 
 Every generated request also includes a generic recent-integration feedback
-contract. The worker must inspect the latest accepted baseline against the
-project intent, report mismatches, regression risks, missing tests,
-documentation gaps, and safe integration repairs in `SUMMARY.md` and
-`REMAINING.md`, and state explicitly when that review found no actionable gap.
+contract. The worker must inspect the latest accepted baseline and other
+relevant recent implementation seams against the project intent, report
+mismatches, regression risks, missing tests, documentation gaps, and safe
+integration repairs in `SUMMARY.md` and `REMAINING.md`, and state explicitly
+when that review found no actionable gap.
 
 The worker is asked to return one ZIP with this root layout:
 

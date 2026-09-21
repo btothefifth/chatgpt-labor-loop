@@ -690,18 +690,20 @@ delivery as blocked and do not claim that the artifact was delivered.
 
 
 def recent_integration_feedback_contract() -> str:
-    """Require every worker round to inspect the last accepted integration."""
+    """Require every worker round to review recent and relevant implementation."""
     return """## Recent integration feedback (required)
 
 Before changing code, review the most recent accepted integration or baseline
-commit named by this request. Compare it with the repository's stated intent
-and acceptance contract. In the returned SUMMARY.md and REMAINING.md, record:
+commit named by this request, plus any other recent or relevant implemented
+mechanism that the requested slice touches or depends on. Compare those
+surfaces with the repository's stated intent and acceptance contract. In the
+returned SUMMARY.md and REMAINING.md, record:
 
 - any intent mismatch, regression risk, missing test, documentation gap, or
   integration repair you found;
 - which findings are in scope for this round and which remain deferred; and
 - why the new work preserves the accepted behavior and does not duplicate an
-  existing mechanism.
+  existing mechanism. Name the reviewed surfaces, not just the new files.
 
 Only repair a prior finding when the evidence is direct, the change is
 bounded, and it does not silently expand the requested scope. A clean review
