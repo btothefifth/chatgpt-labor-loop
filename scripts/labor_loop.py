@@ -310,7 +310,17 @@ def normalize_remote(value: Any) -> str | None:
 
 
 def contains_secret(text: str) -> bool:
-    return any(pattern.search(text) for pattern in SECRET_PATTERNS)
+    """Reject likely literal secrets without rejecting safe code references."""
+    for pattern in SECRET_PATTERNS:
+        for match in pattern.finditer(text):
+            value = re.split(r"[:=]\s*", match.group(0), maxsplit=1)[-1]
+            value = value.strip().rstrip(",;)]}")
+            if re.fullmatch(
+                r"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?", value
+            ):
+                continue
+            return True
+    return False
 
 
 def scrub_local_paths(text: str, repo: Path) -> str:
@@ -661,8 +671,22 @@ def make_packet_zip(job_dir: Path, files: Mapping[str, bytes]) -> Path:
     return packet_path
 
 
-def worker_return_contract() -> str:
-    return """Return exactly one ZIP with these root entries:
+def worker_return_contract(
+    *, job_id: str | None = None, base_commit: str | None = None, repository: str | None = None
+) -> str:
+    identity = "The packet's job.json is authoritative. Copy its job_id, base_commit, and repository verbatim into manifest.json; never omit them."
+    if job_id and base_commit and repository:
+        identity = (
+            "The packet's job.json is authoritative. Copy this exact identity into "
+            "manifest.json without alteration:\n\n```json\n"
+            + json.dumps(
+                {"job_id": job_id, "base_commit": base_commit, "repository": repository},
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n```"
+        )
+    return f"""Return exactly one ZIP with these root entries:
 
 manifest.json
 START_HERE.md
@@ -674,7 +698,9 @@ changes.patch
 files/<optional complete changed files>
 evidence/<optional supporting evidence>
 
-manifest.json must include this job_id, base_commit, and repository. changes.patch
+{identity}
+
+manifest.json must include the exact job_id, base_commit, and repository above. changes.patch
 is the canonical integration representation. Be honest about partial work and
 unresolved items; do not claim tests that were not actually run.
 
@@ -850,7 +876,9 @@ def create_job(
             "total_bytes": total,
         },
         "scope": {"local_changes_excluded": info["changed"]},
-        "return_contract": worker_return_contract(),
+        "return_contract": worker_return_contract(
+            job_id=job_id, base_commit=resolved_base, repository=repository_url
+        ),
         "artifact_delivery": {
             "schema_version": "labor-loop.artifact-delivery.v1",
             "preferred": "direct-attachment",
@@ -865,7 +893,9 @@ def create_job(
         + "\n\n"
         + recent_integration_feedback_contract()
         + "\n\n## Machine return contract\n\n"
-        + worker_return_contract()
+        + worker_return_contract(
+            job_id=job_id, base_commit=resolved_base, repository=repository_url
+        )
     )
     context_out = (
         "# Selected context\n\n"

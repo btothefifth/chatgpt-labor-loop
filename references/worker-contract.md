@@ -38,6 +38,10 @@ evidence/<optional worker evidence>
 ```
 
 `manifest.json` must identify the same `job_id`, `base_commit`, and repository.
+The generated request includes the concrete identity values from `job.json`;
+copy them verbatim rather than reconstructing or omitting them. If the worker
+cannot produce that exact identity, it must report delivery as blocked instead
+of returning a ZIP that cannot be bound to the job.
 `changes.patch` is canonical and may be empty only when the worker made no code
 change. The local validator rejects traversal, absolute names, symlinks, `.git`,
 executable payloads, size-limit violations, required-file omissions, identity

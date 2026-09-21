@@ -1,5 +1,12 @@
 # Labor Loop
 
+## Active design work
+
+The [current work pointer](docs/implementation/CURRENT.md) tracks the reviewed
+BMAD plan for a client-independent, multi-service loop with deterministic
+recovery and verified local learning. Those documents describe a target v2;
+the commands and features below describe the existing v1 implementation.
+
 `labor-loop` is a reusable Codex skill and local CLI for delegating bounded
 implementation work to a persistent normal ChatGPT Chat thread while keeping
 the repository, tests, Git state, and acceptance decision under local control.

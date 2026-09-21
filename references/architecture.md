@@ -1,5 +1,9 @@
 # Labor-loop architecture
 
+This document describes the v1 implementation. The
+[current work pointer](../docs/implementation/CURRENT.md) routes to the target
+v2 contracts and implementation plan; proposed capabilities are not yet shipped.
+
 The system has two deliberately separate planes.
 
 ## Local authority plane
