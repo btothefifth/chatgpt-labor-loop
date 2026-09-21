@@ -689,6 +689,26 @@ delivery as blocked and do not claim that the artifact was delivered.
 """
 
 
+def recent_integration_feedback_contract() -> str:
+    """Require every worker round to inspect the last accepted integration."""
+    return """## Recent integration feedback (required)
+
+Before changing code, review the most recent accepted integration or baseline
+commit named by this request. Compare it with the repository's stated intent
+and acceptance contract. In the returned SUMMARY.md and REMAINING.md, record:
+
+- any intent mismatch, regression risk, missing test, documentation gap, or
+  integration repair you found;
+- which findings are in scope for this round and which remain deferred; and
+- why the new work preserves the accepted behavior and does not duplicate an
+  existing mechanism.
+
+Only repair a prior finding when the evidence is direct, the change is
+bounded, and it does not silently expand the requested scope. A clean review
+is valid evidence too: state that you checked and found no actionable gap.
+"""
+
+
 def artifact_delivery_followup(
     *, job_id: str, base_commit: str, repository_url: str | None, reason: str
 ) -> str:
@@ -704,6 +724,8 @@ artifact. The integration owner observed this delivery problem:
 Please repackage the completed work and return the same integration contract.
 The pinned base commit is `{base_commit}`.
 {repository_line}
+
+{recent_integration_feedback_contract()}
 Delivery is part of acceptance. Use one of these methods, in priority order:
 
 1. Attach the ZIP directly to this ChatGPT response so it is visibly
@@ -838,6 +860,8 @@ def create_job(
     request_out = (
         "# Labor-loop worker request\n\n"
         + request_text.rstrip()
+        + "\n\n"
+        + recent_integration_feedback_contract()
         + "\n\n## Machine return contract\n\n"
         + worker_return_contract()
     )

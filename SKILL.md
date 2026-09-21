@@ -16,6 +16,10 @@ The local scripts in [scripts/labor_loop.py](scripts/labor_loop.py) own determin
 ## Normal invocation
 
 1. Inspect the project’s current pointer, owning contract/backlog, Git state, and the existing `$chat-gpt-helper` instructions. Choose one coherent worker slice and write a standalone request with acceptance criteria, allowed scope, exclusions, and the return contract.
+   Every generated round must also ask the worker to review the most recently
+   accepted integration against project intent and record any mismatch,
+   regression risk, missing test, documentation gap, or safe repair in its
+   returned summary; a clean review must be stated explicitly.
 2. Initialize or reuse the private project mapping, then package the request and selected committed context:
 
    ```text
